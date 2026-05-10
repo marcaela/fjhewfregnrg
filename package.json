@@ -1,0 +1,19 @@
+{
+  "name": "cgpt-link",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1",
+    "node-fetch": "^3.3.2",
+    "undici": "^8.2.0"
+  }
+}

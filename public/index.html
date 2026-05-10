@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPT Checkout Generator</title>
+    <meta name="description" content="Generate GPT subscription checkout links quickly and securely.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0a1a 0%, #1a0e2e 40%, #0d1117 100%);
+            min-height: 100vh;
+        }
+
+        .card-glow {
+            box-shadow: 0 0 60px -12px rgba(139, 92, 246, 0.15);
+        }
+
+        .plan-card { cursor: pointer; transition: all 0.25s ease; }
+        .plan-card:not(.disabled):hover { transform: translateY(-2px); }
+        .plan-card.disabled { cursor: not-allowed; opacity: 0.5; position: relative; }
+        .plan-card.disabled::after {
+            content: 'Unavailable';
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            font-size: 10px; font-weight: 600;
+            padding: 2px 8px; border-radius: 9999px;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .search-dropdown { position: relative; }
+        .search-dropdown-input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.5);
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+        .search-dropdown-input:focus { border-color: #8b5cf6; }
+        .search-dropdown-list {
+            display: none;
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: #1e293b;
+            border: 1px solid rgba(100, 116, 139, 0.5);
+            border-radius: 0.75rem;
+            margin-top: 4px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 50;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .search-dropdown-list.open { display: block; }
+        .search-dropdown-item {
+            padding: 0.6rem 1rem;
+            font-size: 0.875rem;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .search-dropdown-item:hover { background: rgba(139, 92, 246, 0.15); }
+        .search-dropdown-item.active { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
+        .search-dropdown-divider {
+            height: 1px;
+            background: rgba(100, 116, 139, 0.3);
+            margin: 4px 0;
+        }
+        .search-dropdown-empty {
+            padding: 1rem;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+
+        .btn-shimmer {
+            background-size: 200% auto;
+            animation: shimmer 3s ease-in-out infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 0% center; }
+            50% { background-position: 100% center; }
+            100% { background-position: 0% center; }
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.4s ease-out;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stat-card {
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+
+        /* Scrollbar styling */
+        .search-dropdown-list::-webkit-scrollbar { width: 6px; }
+        .search-dropdown-list::-webkit-scrollbar-track { background: transparent; }
+        .search-dropdown-list::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen text-gray-100 antialiased font-sans">
+
+    <div class="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+
+        <!-- HEADER -->
+        <header class="flex items-center gap-4 mb-8" id="header-section">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center">
+                <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <rect x="1" y="4" width="22" height="16" rx="3" ry="3"></rect>
+                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-white">Checkout Generator</h1>
+                <p class="text-sm text-gray-400 mt-0.5">Instantly create GPT subscription checkout links</p>
+            </div>
+        </header>
+
+        <!-- STATS CARDS -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8" id="stats-section">
+            <div class="stat-card bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-2xl p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Total Generated</span>
+                </div>
+                <p class="text-3xl font-extrabold text-white mb-1" id="stat-total">0</p>
+                <span class="text-xs font-medium text-gray-500">All time</span>
+            </div>
+            <div class="stat-card bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-2xl p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Business</span>
+                </div>
+                <p class="text-3xl font-extrabold text-white mb-1" id="stat-team">0</p>
+                <span class="text-xs font-medium text-gray-500">Team plans</span>
+            </div>
+            <div class="stat-card bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-2xl p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Plus</span>
+                </div>
+                <p class="text-3xl font-extrabold text-white mb-1" id="stat-plus">0</p>
+                <span class="text-xs font-medium text-gray-500">Personal plans</span>
+            </div>
+        </section>
+
+        <!-- MAIN CARD -->
+        <main class="bg-slate-800/50 backdrop-blur border border-purple-900/50 rounded-2xl p-6 sm:p-8 card-glow" id="main-card">
+
+            <!-- Plan Selection Header -->
+            <div class="flex items-center gap-2.5 mb-5">
+                <div class="w-5 h-5 rounded-md bg-purple-500/20 flex items-center justify-center">
+                    <svg class="w-3 h-3 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                </div>
+                <h2 class="text-lg font-semibold text-white">Select a subscription plan</h2>
+            </div>
+
+            <!-- Plan Options -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8" id="plan-grid">
+                <!-- GPT Business (DISABLED) -->
+                <div class="plan-card disabled rounded-xl border-2 border-slate-600/50 bg-slate-700/30 p-5" id="plan-team">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="plan-icon w-10 h-10 rounded-lg bg-slate-600/30 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="plan-name font-semibold text-gray-400 text-sm">GPT Business</p>
+                                <p class="plan-desc text-xs text-gray-500">Region-specific</p>
+                                <p class="plan-desc text-xs text-gray-500">Team (up to 5 seats)</p>
+                            </div>
+                        </div>
+                        <div class="text-right ml-3 flex-shrink-0">
+                            <p class="text-xl font-bold text-gray-400 plan-price">IDR 0</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- GPT Plus (DEFAULT SELECTED) -->
+                <div class="plan-card rounded-xl border-2 border-green-500/60 bg-green-500/10 p-5" id="plan-plus" onclick="selectPlan('plus')">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="plan-icon w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="plan-name font-semibold text-green-300 text-sm">GPT Plus</p>
+                                <p class="plan-desc text-xs text-green-400/60">Region-specific</p>
+                                <p class="plan-desc text-xs text-green-400/60">Personal Use</p>
+                            </div>
+                        </div>
+                        <div class="text-right ml-3 flex-shrink-0">
+                            <p class="text-xl font-bold text-green-300 plan-price">IDR 0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-slate-700/60 mb-8"></div>
+
+            <!-- Configuration Form -->
+            <div class="space-y-5" id="config-form">
+
+                <!-- Payment Method Dropdown -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Payment Method</label>
+                    <div class="search-dropdown" id="paymentDropdown">
+                        <div class="search-dropdown-input" id="paymentDisplay" onclick="togglePaymentDropdown()">
+                            Direct Checkout — via ChatGPT
+                        </div>
+                        <input type="hidden" id="paymentMethod" value="shortlink">
+                        <div class="search-dropdown-list" id="paymentList">
+                            <div class="search-dropdown-item active" data-value="shortlink"
+                                 onclick="selectPayment('shortlink', 'Direct Checkout — via ChatGPT')">
+                                Direct Checkout — via ChatGPT
+                            </div>
+                            <div class="search-dropdown-item" data-value="longlink"
+                                 onclick="selectPayment('longlink', 'Stripe Hosted — via Stripe')">
+                                Stripe Hosted — via Stripe
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Currency Region (searchable) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Currency Region</label>
+                    <div class="search-dropdown" id="currencyDropdown">
+                        <input type="text" class="search-dropdown-input" id="currencySearch"
+                               placeholder="Search country..." autocomplete="off"
+                               onfocus="openCurrencyDropdown()" oninput="filterCurrencies()">
+                        <input type="hidden" id="currencyCode" value="Indonesia">
+                        <div class="search-dropdown-list" id="currencyList">
+                            <!-- Dynamically populated from /gpt/currency API -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Proxy Configuration -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Proxy</label>
+                    <div class="search-dropdown" id="proxyDropdown">
+                        <div class="search-dropdown-input" id="proxyDisplay" onclick="toggleProxyDropdown()">
+                            No Proxy — Server IP
+                        </div>
+                        <input type="hidden" id="proxyMode" value="none">
+                        <div class="search-dropdown-list" id="proxyList">
+                            <div class="search-dropdown-item active" data-value="none"
+                                 onclick="selectProxy('none', 'No Proxy — Server IP')">
+                                No Proxy — Server IP
+                            </div>
+                            <div class="search-dropdown-item" data-value="manual"
+                                 onclick="selectProxy('manual', 'Manual Proxy')">
+                                Manual Proxy
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Manual proxy input (shown only when manual is selected) -->
+                    <div id="manualProxySection" class="hidden mt-2 space-y-2">
+                        <input type="text" id="manualProxyInput" placeholder="e.g. 103.152.112.166:8080"
+                               class="w-full bg-slate-900/80 border border-slate-600/50 rounded-xl px-4 py-3
+                                      text-sm text-gray-200 placeholder-gray-500 focus:outline-none
+                                      focus:border-purple-500 transition-colors">
+                        <p class="text-xs text-gray-500 leading-relaxed">
+                            Free proxy sources:
+                            <a href="https://spys.one/free-proxy-list/" target="_blank" class="text-purple-400 hover:text-purple-300 underline">Spys.one</a>,
+                            <a href="https://free.geonix.com/" target="_blank" class="text-purple-400 hover:text-purple-300 underline">Geonix</a>,
+                            <a href="https://www.freeproxy.world/" target="_blank" class="text-purple-400 hover:text-purple-300 underline">FreeProxy.world</a>,
+                            <a href="https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=JP&ssl=all&anonymity=all" target="blank" class="text-purple-400 hover:text-purple-300 underline">ProxyScrape JP</a>,
+                            <a href="https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=KR&ssl=all&anonymity=all" target="_blank" class="text-purple-400 hover:text-purple-300 underline">KR</a>,
+                            <a href="https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=TH&ssl=all&anonymity=all" target="_blank" class="text-purple-400 hover:text-purple-300 underline">TH</a>,
+                            <a href="https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=ID&ssl=all&anonymity=all" target="_blank" class="text-purple-400 hover:text-purple-300 underline">ID</a>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Access Token / Auth Session -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Auth Session</label>
+                    <textarea id="accessToken" rows="5"
+                              placeholder="Paste your accessToken / Session JSON in here..."
+                              class="w-full bg-slate-900/80 border border-slate-600/50 rounded-xl px-4 py-3
+                                     text-sm text-gray-200 placeholder-gray-500 focus:outline-none
+                                     focus:border-purple-500 transition-colors resize-none"></textarea>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="mt-6 flex items-start gap-3 bg-purple-500/10 border border-purple-500/20 rounded-xl px-4 py-3.5" id="info-box">
+                <div class="flex-shrink-0 w-5 h-5 rounded-full bg-purple-500/25 flex items-center justify-center mt-0.5">
+                    <svg class="w-3 h-3 text-purple-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                </div>
+                <p class="text-xs text-purple-200/80 leading-relaxed">
+                    Open <a href="https://chatgpt.com/api/auth/session" target="_blank"
+                            class="font-semibold text-purple-300 underline underline-offset-2 hover:text-purple-200">
+                        chatgpt.com/api/auth/session</a>
+                    in your browser while logged in, then copy and paste the entire JSON response into the field above.
+                </p>
+            </div>
+
+            <!-- Generate Button -->
+            <button id="generateBtn" onclick="generatePaymentLink()"
+                    class="btn-shimmer mt-6 w-full flex items-center justify-center gap-2.5
+                           bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600
+                           hover:from-purple-500 hover:to-indigo-500 text-white font-semibold
+                           py-3.5 rounded-xl transition-all duration-300 focus:outline-none
+                           focus:ring-2 focus:ring-purple-500/50">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+                <span>Generate</span>
+            </button>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="hidden mt-6 flex items-center justify-center gap-3 py-4">
+                <svg class="spinner w-5 h-5 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke-dasharray="31.42" stroke-dashoffset="10"></circle>
+                </svg>
+                <span class="text-sm text-gray-400">Generating...</span>
+            </div>
+
+            <!-- SUCCESS STATE -->
+            <div id="successBox" class="hidden mt-6">
+                <div class="fade-in-up bg-green-900/20 border border-green-500/50 rounded-2xl p-6 relative">
+                    <button onclick="document.getElementById('successBox').classList.add('hidden')"
+                            class="absolute top-3 right-3 w-6 h-6 rounded-full bg-green-800/50 hover:bg-green-700/50 flex items-center justify-center transition-colors">
+                        <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-8 h-8 rounded-full bg-green-500/25 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="font-bold text-green-400 text-base">Checkout link created!</p>
+                            <p class="text-xs text-green-500/70 mt-0.5">Your link is ready — share or open it below</p>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <span class="text-xs font-medium text-gray-400">Payment Link</span>
+                        <input type="text" id="resultUrl" readonly
+                               class="w-full bg-gray-100 text-gray-800 text-sm font-mono px-4 py-3
+                                      rounded-xl border border-gray-300 focus:outline-none select-all cursor-text mt-1"
+                               style="filter: blur(5px);"
+                               onmouseenter="this.style.filter='none'"
+                               onmouseleave="this.style.filter='blur(5px)'" value="">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="copyBtn" onclick="copyLink()"
+                                class="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500
+                                       text-white font-semibold py-2.5 rounded-xl transition-colors text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>Copy Link</span>
+                        </button>
+                        <button onclick="openLink()"
+                                class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600
+                                       hover:from-purple-500 hover:to-indigo-500 text-white font-semibold
+                                       py-2.5 rounded-xl transition-all text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                            <span>Open Link</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERROR STATE -->
+            <div id="errorBox" class="hidden mt-6">
+                <div class="fade-in-up bg-red-900/20 border border-red-500/50 rounded-2xl p-5 relative">
+                    <button onclick="document.getElementById('errorBox').classList.add('hidden')"
+                            class="absolute top-3 right-3 w-6 h-6 rounded-full bg-red-800/50 hover:bg-red-700/50 flex items-center justify-center transition-colors">
+                        <svg class="w-3 h-3 text-red-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-red-500/25 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="font-bold text-red-400 text-sm">Something went wrong</p>
+                            <p class="text-xs text-red-400/70 mt-0.5" id="errorMsg"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <footer class="mt-8 text-center">
+            <p class="text-xs text-gray-600">GPT Checkout Generator</p>
+        </footer>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
